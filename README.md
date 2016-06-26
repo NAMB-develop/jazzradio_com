@@ -1,2 +1,2 @@
 # jazzradio_com
-Extension for NAMB
+Plugin for NAMB
