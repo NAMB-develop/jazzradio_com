@@ -28,6 +28,9 @@ def initialize_dict():
         raise Exception("Channels could not be initialized.")
 
 def get_currently_playing_channel(channel_key):
+    global CHANNEL_NAME_ID_DICT
+    if not CHANNEL_NAME_ID_DICT:
+        initialize_dict()
     l=get_currently_playing()
     return "%s - %s" % (l[CHANNEL_NAME_ID_DICT[channel_key]]['display_artist'], l[CHANNEL_NAME_ID_DICT[channel_key]]['display_title'])
 
@@ -36,7 +39,8 @@ def play(channel_key):
     referer="http://www.jazzradio.com/"+channel_key
     instance=vlc.get_default_instance()
     global PLAYER
-    PLAYER=instance.media_player_new()
+    if not PLAYER:
+        PLAYER=instance.media_player_new()
     media=instance.media_new(streams[0])
     global HTTP_SETTINGS
     media.add_option(":http-user-agent="+HTTP_SETTINGS["User-Agent"])
@@ -70,7 +74,6 @@ def load_channels():
     result = json.loads(resp)
     global CHANNELS
     CHANNELS=result
-    return result
 
 def get_stream_for_channel(channel_key):
     url = "http://listen.jazzradio.com/webplayer/"+channel_key+".jsonp?callback=_API_Playlists_getChannel"
