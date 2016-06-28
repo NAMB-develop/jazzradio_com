@@ -5,11 +5,6 @@ def init():
     global plugin
     import plugin
 
-def play():
-    global vlc
-    i = vlc.get_default_instance()
-    print(i)
-
 def display(parent):
     import Tkinter as tkint
     
