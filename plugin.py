@@ -2,6 +2,7 @@ import urllib2 as _urllib #FIXME: _urllib is not a good name.
 import json
 
 CHANNELS=None
+FILTERS=None
 HTTP_SETTINGS={"User-Agent":"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36"
                }
 PLAYER=None
@@ -19,13 +20,13 @@ def initialize_dict():
     if not CHANNELS:
         load_channels()
     if CHANNELS:
-        for i in range(len(CHANNELS['channels'])):
-            if 'key' in CHANNELS['channels'][i]['channel']:
-                name=CHANNELS['channels'][i]['channel']['key']
-                channel_id=CHANNELS['channels'][i]['channel']['id']
+        for i in CHANNELS:
+            if 'key' in i:
+                name=i['key']
+                channel_id=i['id']
                 CHANNEL_NAME_ID_DICT[name]=str(channel_id)
     else:
-        raise Exception("Channels could not be initialized.")
+        raise Exception("Channels have not been initialized.")
 
 def get_currently_playing_channel(channel_key):
     global CHANNEL_NAME_ID_DICT
@@ -70,10 +71,10 @@ def load_channels():
     filters = el[1][el[1].index("{"):].rsplit(";")[0]
     channels = el[2][el[2].index("["):].rsplit(";")[0]
     
-    resp = "{\"filters\":"+filters+", \"channels\":"+channels+"}"
-    result = json.loads(resp)
     global CHANNELS
-    CHANNELS=result
+    CHANNELS=[i['channel'] for i in json.loads(channels)]
+    global FILTERS
+    FILTERS=json.loads(filters)
 
 def get_stream_for_channel(channel_key):
     url = "http://listen.jazzradio.com/webplayer/"+channel_key+".jsonp?callback=_API_Playlists_getChannel"
