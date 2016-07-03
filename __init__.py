@@ -2,6 +2,7 @@ vlc=None
 plugin=None
 player_frame=None
 
+
 import Tkinter as tkint
 
 class List(object):
@@ -12,22 +13,63 @@ class List(object):
         self.frame = tkint.Frame(self.parent, bg="#0f0f0f")
         self.frame.place(x=0,y=height/10,width=width,height=int((height/10.0)*8))
         self.at=0
+        self.parent.master.master.bind("<Up>", lambda e: self.shift(1))
+        self.parent.master.master.bind("<Down>", lambda e: self.shift(-1))
+        self.parent.master.master.bind("<Return>", lambda e: self.select())
+
+    def receive(self, event):
+        import namb.keys
+        import namb.ui_processor
+        if event==namb.keys.UP:
+            self.shift(1)
+        elif event==namb.keys.DOWN:
+            self.shift(-1)
+        elif event==namb.keys.ENTER:
+            self.select()
+        elif event==namb.keys.BACK:
+            namb.ui_processor.set_receiver(self.parent.tabs)
+
+    def select(self):
+        key=self.items[self.at][1]['key']
+        plugin.play(key)
 
     def populate(self, items):
         self.items = []
         for i in items:
-            self.items.append((tkint.Canvas(self.frame, bg="gray", highlightthickness=0), i))
-        self.frame.place(height=int((height/15.0)*len(items)))
+            self.items.append((tkint.Canvas(self.frame, bg="#5f5f5f", highlightthickness=0), i))
+        self.frame.place(height=int((height/15)*(len(items)+1)))
         index=-1
+        offset=height/30
         for i in self.items:
             index=index+1
-            i[0].place(x=0,y=(index*(height/15.0)), width=width, height=height/15)
-            i[0].create_text(0,0,text="Hello",fill="white")
+            i[0].config(bg="#5f5f5f" if index%2==0 else "#4f4f4f")
+            i[0].place(x=0,y=offset+(index*(height/15)), width=width, height=height/15)
+            i[0].create_text(width/2,height/30,text=i[1]["name"],fill="white", font=("Verdana", 18))
 
-        self.frame.place(y=(height/10)-(height/15))
+        self.update(0)
+
+    def update(self, posneg):
+        prev=self.at
+        cur=self.at+posneg
+        self.items[prev][0].config(bg="#5f5f5f" if prev%2==0 else "#4f4f4f")
+        self.items[cur][0].config(bg="#9f9f9f")
+        self.at=self.at+posneg
+        print(self.at)
 
     def clear(self):
         self.items = None
+
+    def shift(self, posneg):
+        p=posneg*-1
+        if p+self.at<0 or p+self.at==len(self.items):
+            return
+
+        if self.items[p+self.at][0].winfo_y()+self.frame.winfo_y()>(height/10.0)*8 or self.items[p+self.at][0].winfo_y()+self.frame.winfo_y()<height/10:
+            offset=posneg*(height/15)
+            self.frame.place(y=self.frame.winfo_y()+offset)
+
+        self.update(p)
+        
         
 
 class Tabs(object):
@@ -79,7 +121,7 @@ class Menu(object):
         self.frame.place(x=0,y=0,width=width,height=int((height/100.0)*90))
         self.list=List(self.frame)
         self.tabs=Tabs(self.frame)
-        self.list.populate("a b c d e f g".split(" "))
+        self.list.populate(plugin.CHANNELS)
 
 class Player(object):
 
@@ -89,10 +131,10 @@ class Player(object):
         #width=parent.winfo_width() if parent.winfo_width()>1 else 1280
         #height=parent.winfo_height() if parent.winfo_height()>1 else 720
         
-        self.playerframe = tkint.Frame(self.parent, bg="#3f3f3f")
+        self.playerframe = tkint.Frame(self.parent, bg="#2f2f2f")
         self.playerframe.place(x=0,rely=.9,relwidth=1,relheight=.1)
 
-        self.playbutton = tkint.Canvas(self.playerframe, bg="#3f3f3f", highlightthickness=0)
+        self.playbutton = tkint.Canvas(self.playerframe, bg="#2f2f2f", highlightthickness=0)
         self.playbutton.place(x=width/100, y=0, width=.1*height, height=.1*height)
 
         self.playbuttontriangle = self.playbutton.create_polygon([height/50,height/50,(height/10)-height/50,height/20,height/50,(height/10)-height/50], fill="gray")
@@ -100,9 +142,9 @@ class Player(object):
         self.playbutton.tag_bind(self.playbuttontriangle, "<Enter>", lambda e: self.playbutton.itemconfig(self.playbuttontriangle, fill="white"))
         self.playbutton.tag_bind(self.playbuttontriangle, "<Leave>", lambda e: self.playbutton.itemconfig(self.playbuttontriangle, fill="gray"))
         self.playbutton.bind("<Enter>", lambda e: self.playbutton.config(background="#4f4f4f"))
-        self.playbutton.bind("<Leave>", lambda e: self.playbutton.config(background="#3f3f3f"))
+        self.playbutton.bind("<Leave>", lambda e: self.playbutton.config(background="#2f2f2f"))
 
-        self.stopbutton = tkint.Canvas(self.playerframe, bg="#3f3f3f", highlightthickness=0)
+        self.stopbutton = tkint.Canvas(self.playerframe, bg="#2f2f2f", highlightthickness=0)
         self.stopbutton.place(x=(width/50)+(height/10), y=0, width=height/10, height=height/10)
 
         self.stopbuttonsquare = self.stopbutton.create_polygon([height/50,height/50, (height/10)-(height/50), height/50, (height/10)-(height/50), (height/10)-(height/50), height/50, (height/10)-(height/50)], fill="gray")
@@ -110,7 +152,7 @@ class Player(object):
         self.stopbutton.tag_bind(self.stopbuttonsquare, "<Enter>", lambda e: self.stopbutton.itemconfig(self.stopbuttonsquare, fill="white"))
         self.stopbutton.tag_bind(self.stopbuttonsquare, "<Leave>", lambda e: self.stopbutton.itemconfig(self.stopbuttonsquare, fill="gray"))
         self.stopbutton.bind("<Enter>", lambda e: self.stopbutton.config(background="#4f4f4f"))
-        self.stopbutton.bind("<Leave>", lambda e: self.stopbutton.config(background="#3f3f3f"))
+        self.stopbutton.bind("<Leave>", lambda e: self.stopbutton.config(background="#2f2f2f"))
 
         self.playing = tkint.Canvas(self.playerframe, bg="#4f4f4f", highlightthickness=0)
         self.playing.place(x=(width/50)+(height/5)+(width/100), y=height/100, width=.85*width, height=(height/25)-(height/100))
@@ -120,6 +162,8 @@ class Player(object):
 
         self.timebar = tkint.Canvas(self.playerframe, bg="#1f1f1f", highlightthickness=0,bd=0)
         self.timebar.place(x=(width/50)+(height/5)+(width/100), y=(height/100)+(height/25), width=.85*width, height=(height/25)-(height/100))
+
+        self.currentloctext=self.timebar.create_text(.85*width,((height/25)-(height/100))/2, anchor=tkint.E, text="0:00", fill="white")
 
         self.currentloc = self.timebar.create_polygon([0,0,(.85*width)/2,0,(.85*width)/2, (height/25)-(height/100),0,(height/25)-(height/100)], fill="gray")
     
@@ -154,6 +198,8 @@ if __name__=="__main__":
 
     import extensions
     extensions.load_extension("vlc")
+
+    global root
     
     #import Tkinter as tkint
     root=tkint.Tk()

@@ -72,7 +72,7 @@ def load_channels():
     channels = el[2][el[2].index("["):].rsplit(";")[0]
     
     global CHANNELS
-    CHANNELS=[i['channel'] for i in json.loads(channels)]
+    CHANNELS=[i['channel'] for i in json.loads(channels) if i['channel']['type']=='channel']
     global FILTERS
     FILTERS=json.loads(filters)
 
