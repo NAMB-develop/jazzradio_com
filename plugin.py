@@ -73,6 +73,7 @@ def load_channels():
     
     global CHANNELS
     CHANNELS=[i['channel'] for i in json.loads(channels) if i['channel']['type']=='channel']
+    CHANNELS.sort(key=lambda x: x['name'])
     global FILTERS
     FILTERS=json.loads(filters)
 

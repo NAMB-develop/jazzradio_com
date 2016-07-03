@@ -44,7 +44,8 @@ class List(object):
             index=index+1
             i[0].config(bg="#5f5f5f" if index%2==0 else "#4f4f4f")
             i[0].place(x=0,y=offset+(index*(height/15)), width=width, height=height/15)
-            i[0].create_text(width/2,height/30,text=i[1]["name"],fill="white", font=("Verdana", 18))
+            i[0].create_text(width/30,height/30,anchor=tkint.W, text=i[1]["name"],fill="white", font=("Verdana", 18))
+            #i[0].create_text(width/2,height/30,text=i[1]["name"],fill="white", font=("Verdana", 18))
 
         self.update(0)
 
@@ -174,12 +175,12 @@ def init():
     plugin.load_channels()
     plugin.initialize_dict()
 
-def display(parent):
+def display(parent, geom=(1280,720)):
 
     global width
-    width=parent.winfo_width() if parent.winfo_width() > 1 else 1280
+    width=parent.winfo_width() if parent.winfo_width() > 1 else geom[0]
     global height
-    height=parent.winfo_height() if parent.winfo_height() > 1 else 720
+    height=parent.winfo_height() if parent.winfo_height() > 1 else geom[1]
     
     frame = tkint.Frame(parent, bg="black")
     frame.place(x=0,y=0,relwidth=1,relheight=1)
@@ -203,8 +204,11 @@ if __name__=="__main__":
     
     #import Tkinter as tkint
     root=tkint.Tk()
-    root.geometry("1280x720+0+0")
+    #root.geometry("1280x720+0+0")
+    root.attributes('-fullscreen', True)
+    root.bind("<Escape>", lambda e: root.destroy())
+    root.focus_set()
 
     init()
-    display(root)
+    display(root, (root.winfo_screenwidth(), root.winfo_screenheight()))
     root.mainloop()
