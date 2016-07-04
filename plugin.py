@@ -1,18 +1,27 @@
 import urllib2 as _urllib #FIXME: _urllib is not a good name.
 import json
 
+TIME_DIFF=0
+global AUDIO_DELAY
+AUDIO_DELAY=3000000
+
 CHANNELS=None
 FILTERS=None
 HTTP_SETTINGS={"User-Agent":"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36"
                }
 PLAYER=None
 CHANNEL_NAME_ID_DICT={}
-
-import extensions
 global vlc
-vlc = extensions.get_extension('vlc')
-if not vlc:
-    raise Exception("VLC extension not loaded.")
+vlc=None
+
+if __name__=="__main__":
+    pass
+else:
+    import extensions
+    global vlc
+    vlc = extensions.get_extension('vlc')
+    if not vlc:
+        raise Exception("VLC extension not loaded.")
 
 def initialize_dict():
     global CHANNELS
@@ -42,6 +51,7 @@ def play(channel_key):
     global PLAYER
     if not PLAYER:
         PLAYER=instance.media_player_new()
+        vlc.libvlc_audio_set_delay(PLAYER, AUDIO_DELAY)
     media=instance.media_new(streams[0])
     global HTTP_SETTINGS
     media.add_option(":http-user-agent="+HTTP_SETTINGS["User-Agent"])
@@ -89,4 +99,57 @@ def get_currently_playing():
     response = _urllib.urlopen(url).read()
     result = json.loads(response)
     return result
+
+def get_channel_history(channel_id):
+    url="http://api.audioaddict.com/v1/jazzradio/track_history/channel/%s.json" % channel_id
+    response = _urllib.urlopen(url).read()
+    result = json.loads(response)
+    return result
+
+#FIXME: UNTESTED
+def ping_procedure():
+    import datetime
+    now=datetime.datetime.utcnow()
+    nowsec=int((now-datetime.datetime(1970,1,1)).total_seconds())
+    result=ping_response_parser(ping(nowsec))
+    global TIME_DIFF
+    TIME_DIFF=(now-result).total_seconds()
+    return (now-result).total_seconds()
     
+
+def ping(time_stamp_13_digit):
+    url="http://api.audioaddict.com/v1/ping.jsonp?callback=_AudioAddict_WP_Ping__ping&_=%s" % time_stamp_13_digit
+    response = _urllib.urlopen(url).read()
+    result = response
+    return result
+
+def ping_response_parser(response):
+    import time
+    
+    import re
+    f=re.findall('"time":"([A-Za-z]{1,}, [0-9]{2} [A-Za-z]{1,} [0-9]{4} [0-9]{2}:[0-9]{2}:[0-9]{2} -[0-9]{1,})"', response)
+    if f:
+        import dateutil.parser
+        import datetime
+        z=dateutil.parser.parse(f[0])
+        d=z-z.utcoffset()
+        naived=d.replace(tzinfo=None)
+        
+        t=time.mktime(time.strptime(f[0],'%a, %d %b %Y %H:%M:%S -0400'))
+        return naived
+
+#{"tlPreciseTime":"200","StreamUrl":"","type":"event","insertionType":"midroll","time":"200","durationMilliseconds":"36873","StreamTitle":"JazzRadio.com","metadata":"adswizzContext=fHA6NzY2M158aDozN158cDo3NzM3","name":"NowPlaying","adw_ad":"true"}
+#{"StreamTitle":"Danielle Pauly - Lgende du musette","time":"535","StreamUrl":"","tlPreciseTime":"540","type":"event","name":"NowPlaying"}
+    
+
+#OUTDATED
+def get_referer():
+    url="http://www.jazzradio.com/jazzballads"
+    response = _urllib.urlopen(url).read()
+    import re
+    f = re.findall('src="(/assets/pages/channels-[a-z0-9]*\.js)"', response)
+    if f:
+        f[0]
+    
+    
+

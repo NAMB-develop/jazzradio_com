@@ -29,9 +29,25 @@ class List(object):
         elif event==namb.keys.BACK:
             namb.ui_processor.set_receiver(self.parent.tabs)
 
+    def currently_playing_loop():
+        d=plugin.get_channel_history(self.playing[1]['id'])
+        start=d['started']
+        duration=d['length']
+        import time
+        def loop():
+            current=time.time.now()-start
+            self.playing[0].delete("timer")
+            self.playing[0].create_text(100, 100, anchor=("timer",), text=str(current))
+            self.playing[0].after(1000, loop)
+        self.playing[0].after(1000, loop)
+        
+        
+
     def select(self):
         key=self.items[self.at][1]['key']
-        plugin.play(key)
+        self.playing=self.items[self.at]
+        if plugin.play(key)==0:
+            self.frame.after(1000, self.currently_playing_loop)
 
     def populate(self, items):
         self.items = []
