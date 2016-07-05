@@ -4,50 +4,99 @@ player_frame=None
 
 
 import Tkinter as tkint
+import Queue
+
+def ui_loop():
+    import namb.userinput
+    namb.userinput.process_next()
+    root.after(10, ui_loop)
 
 class List(object):
 
     def __init__(self, parent):
+        self.parentclass =parent
+        self.stop=[True]
         self.items = None
-        self.parent = parent
-        self.frame = tkint.Frame(self.parent, bg="#0f0f0f")
-        self.frame.place(x=0,y=height/10,width=width,height=int((height/10.0)*8))
+        self.parent = parent.frame
+        self.pframe=tkint.Frame(self.parent, bg="#0f0f0f")
+        self.pframe.place(x=0,y=height/10,width=width,height=int(((height/10.0)*9))-(height/30))
+        self.frame = tkint.Frame(self.pframe, bg="#0f0f0f")
+        self.frame.place(x=0,y=0,width=width,height=int(((height/10.0)*9)))
         self.at=0
-        self.parent.master.master.bind("<Up>", lambda e: self.shift(1))
-        self.parent.master.master.bind("<Down>", lambda e: self.shift(-1))
-        self.parent.master.master.bind("<Return>", lambda e: self.select())
+
+        
+        #self.parent.master.master.bind("<Up>", lambda e: self.shift(1))
+        #self.parent.master.master.bind("<Down>", lambda e: self.shift(-1))
+        #self.parent.master.master.bind("<Return>", lambda e: self.select())
+
+    def focus_receive(self):
+        self.activate(self.at)
 
     def receive(self, event):
-        import namb.keys
-        import namb.ui_processor
-        if event==namb.keys.UP:
+        import namb.userinput.keys
+        import namb.userinput
+        if event==namb.userinput.keys.UP:
             self.shift(1)
-        elif event==namb.keys.DOWN:
+        elif event==namb.userinput.keys.DOWN:
             self.shift(-1)
-        elif event==namb.keys.ENTER:
+        elif event==namb.userinput.keys.ENTER:
             self.select()
-        elif event==namb.keys.BACK:
-            namb.ui_processor.set_receiver(self.parent.tabs)
+        elif event==namb.userinput.keys.BACK:
+            self.deactivate(self.at)
+            namb.userinput.set_receiver(self.parentclass.tabs)
+            self.parentclass.tabs.focus_receive()
 
-    def currently_playing_loop():
-        d=plugin.get_channel_history(self.playing[1]['id'])
-        start=d['started']
-        duration=d['length']
-        import time
-        def loop():
-            current=time.time.now()-start
-            self.playing[0].delete("timer")
-            self.playing[0].create_text(100, 100, anchor=("timer",), text=str(current))
-            self.playing[0].after(1000, loop)
-        self.playing[0].after(1000, loop)
+    def currently_playing_loop(self, event=None):
+        st=self.stop
+        c=self.playing
+
+        def format_time(seconds):
+            m=str(seconds/60)
+            s=str(seconds%60)
+            return m if len(m)>1 else "0"+m, s if len(s)>1 else "0"+s
+        
+        def display_current(artist, title):
+            c[0].create_text((c[0].winfo_width()/4), (c[0].winfo_height()/3), anchor=tkint.W, tags=("current",), text="%s - %s" % (artist, title),fill="white")
+
+        
+        start, duration, artist, title = plugin.get_playing_position(c[1]['id'])
+        display_current(artist, title)
+        import time,datetime
+        def loop(start, duration):
+            
+            current=int((plugin.get_msec_epoch()/1000)-start)
+            if duration-current < 3:
+                start, duration, artist, title = plugin.get_playing_position(c[1]['id'])
+                c[0].delete("current")
+                display_current(artist, title)
+                
+            c[0].delete("timer")
+            div=current / float(duration)
+            rem=duration-current
+            c[0].create_rectangle(c[0].winfo_width()/4,(c[0].winfo_height()/8)*5,(c[0].winfo_width()/4)+(((c[0].winfo_width()/8)*5)*div),((c[0].winfo_height()/8)*7), fill="#4f4f4f", tags=("timer",))
+            c[0].create_text(c[0].winfo_width()/4, (c[0].winfo_height()/8)*6, anchor=tkint.W, tags=("timer",), text=" %s:%s"%format_time(current),fill="white")
+            c[0].create_text((c[0].winfo_width()/8)*7, (c[0].winfo_height()/8)*6, anchor=tkint.E, tags=("timer",), text="-%s:%s "%format_time(rem),fill="white")
+            if st[0]:
+                c[0].after(1000, lambda: loop(start, duration))
+            else:
+                c[0].delete("timer")
+                c[0].delete("current")
+        
+        c[0].after(1, lambda: loop(start, duration))
         
         
 
     def select(self):
         key=self.items[self.at][1]['key']
-        self.playing=self.items[self.at]
-        if plugin.play(key)==0:
-            self.frame.after(1000, self.currently_playing_loop)
+        def d():
+            self.stop[0]=False
+            self.stop=[True]
+            self.playing=self.items[self.at]
+            if plugin.play(key)==0:
+                self.frame.after(1, lambda: self.currently_playing_loop())
+        self.frame.after(1, d)
+
+
 
     def populate(self, items):
         self.items = []
@@ -65,13 +114,18 @@ class List(object):
 
         self.update(0)
 
+    def activate(self, item):
+        self.items[item][0].config(bg="#9f9f9f")
+
+    def deactivate(self, item):
+        self.items[item][0].config(bg="#5f5f5f" if item%2==0 else "#4f4f4f")
+
     def update(self, posneg):
         prev=self.at
         cur=self.at+posneg
-        self.items[prev][0].config(bg="#5f5f5f" if prev%2==0 else "#4f4f4f")
-        self.items[cur][0].config(bg="#9f9f9f")
+        self.deactivate(prev)
+        self.activate(cur)
         self.at=self.at+posneg
-        print(self.at)
 
     def clear(self):
         self.items = None
@@ -81,7 +135,7 @@ class List(object):
         if p+self.at<0 or p+self.at==len(self.items):
             return
 
-        if self.items[p+self.at][0].winfo_y()+self.frame.winfo_y()>(height/10.0)*8 or self.items[p+self.at][0].winfo_y()+self.frame.winfo_y()<height/10:
+        if self.items[p+self.at][0].winfo_y()+self.frame.winfo_y()>(height/10.0)*8 or self.items[p+self.at][0].winfo_y()+self.frame.winfo_y()<height/30:
             offset=posneg*(height/15)
             self.frame.place(y=self.frame.winfo_y()+offset)
 
@@ -92,7 +146,8 @@ class List(object):
 class Tabs(object):
 
     def __init__(self, parent):
-        self.parent = parent
+        self.parentclass=parent
+        self.parent = parent.frame
 
         self.frame = tkint.Frame(self.parent, bg="#1f1f1f")
         self.frame.place(x=0,y=0,width=width,height=int(height/10.0))
@@ -100,12 +155,12 @@ class Tabs(object):
         self.channelscanvas = tkint.Canvas(self.frame,bg="#1f1f1f", highlightthickness=0)
         self.channelscanvas.place(x=0,y=0,width=width/2,height=height/10)
 
-        self.channelscanvastext = self.channelscanvas.create_text(width/4, height/20, text="Channels", fill="white", font=("Verdana", 24))
+        self.channelscanvastext = self.channelscanvas.create_text(width/4, height/20, text="Channels", fill="white", font=("Verdana", 18))
 
         self.filterscanvas = tkint.Canvas(self.frame,bg="#1f1f1f", highlightthickness=0)
         self.filterscanvas.place(x=width/2,y=0,width=width/2,height=height/10)
 
-        self.filterscanvastext = self.filterscanvas.create_text(width/4,height/20,text="Filters", fill="white", font=("Verdana", 24))
+        self.filterscanvastext = self.filterscanvas.create_text(width/4,height/20,text="Filters", fill="white", font=("Verdana", 18))
 
         self.channelscanvas.bind("<Enter>", lambda e: self.activate_channels())
         self.channelscanvas.bind("<Leave>", lambda e: self.deactivate_channels())
@@ -113,21 +168,42 @@ class Tabs(object):
         self.filterscanvas.bind("<Enter>", lambda e: self.activate_filters())
         self.filterscanvas.bind("<Leave>", lambda e: self.deactivate_filters())
 
+        self.activate_channels()
+        self.deactivate_filters()
+
+    def focus_receive(self):
+        pass
+        
+    def receive(self, key):
+        import namb.userinput
+        import namb.userinput.keys
+        if key==namb.userinput.keys.LEFT:
+            self.deactivate_filters()
+            self.activate_channels()
+        elif key==namb.userinput.keys.RIGHT:
+            self.deactivate_channels()
+            self.activate_filters()
+        elif key==namb.userinput.keys.BACK:
+            pass
+        elif key==namb.userinput.keys.ENTER:
+            namb.userinput.set_receiver(self.parentclass.list)
+            self.parentclass.list.focus_receive()
+
     def activate_channels(self):
         self.channelscanvas.config(bg="#2f2f2f")
-        self.channelscanvas.itemconfig(self.channelscanvastext, fill="#cccccc")
+        self.channelscanvas.itemconfig(self.channelscanvastext, fill="white")
 
     def deactivate_channels(self):
         self.channelscanvas.config(bg="#1f1f1f")
-        self.channelscanvas.itemconfig(self.channelscanvastext, fill="white")
+        self.channelscanvas.itemconfig(self.channelscanvastext, fill="#cccccc")
 
     def activate_filters(self):
         self.filterscanvas.config(bg="#2f2f2f")
-        self.filterscanvas.itemconfig(self.filterscanvastext, fill="#cccccc")
+        self.filterscanvas.itemconfig(self.filterscanvastext, fill="white")
 
     def deactivate_filters(self):
         self.filterscanvas.config(bg="#1f1f1f")
-        self.filterscanvas.itemconfig(self.filterscanvastext, fill="white")
+        self.filterscanvas.itemconfig(self.filterscanvastext, fill="#cccccc")
         
 
 class Menu(object):
@@ -135,9 +211,9 @@ class Menu(object):
     def __init__(self, parent):
         self.parent = parent
         self.frame = tkint.Frame(self.parent, bg="#0f0f0f")
-        self.frame.place(x=0,y=0,width=width,height=int((height/100.0)*90))
-        self.list=List(self.frame)
-        self.tabs=Tabs(self.frame)
+        self.frame.place(x=0,y=0,width=width,height=int((height)))
+        self.list=List(self)
+        self.tabs=Tabs(self)
         self.list.populate(plugin.CHANNELS)
 
 class Player(object):
@@ -202,7 +278,7 @@ def display(parent, geom=(1280,720)):
     frame.place(x=0,y=0,relwidth=1,relheight=1)
 
     global player_frame
-    player_frame=Player(frame)
+    #player_frame=Player(frame)
     global menu_frame
     menu_frame=Menu(frame)
 
@@ -225,6 +301,16 @@ if __name__=="__main__":
     root.bind("<Escape>", lambda e: root.destroy())
     root.focus_set()
 
+    import namb.userinput.keyboard
+    namb.userinput.keyboard.setup()
+    namb.userinput.keyboard.bind(root)
+
+    import namb.userinput.ui_server
+    namb.userinput.ui_server.run()
+
     init()
     display(root, (root.winfo_screenwidth(), root.winfo_screenheight()))
+    import namb.userinput
+    namb.userinput.set_receiver(menu_frame.list)
+    ui_loop()
     root.mainloop()

@@ -3,7 +3,7 @@ import json
 
 TIME_DIFF=0
 global AUDIO_DELAY
-AUDIO_DELAY=3000000
+AUDIO_DELAY=0
 
 CHANNELS=None
 FILTERS=None
@@ -100,21 +100,45 @@ def get_currently_playing():
     result = json.loads(response)
     return result
 
+def sync_serverstarttime_and_timediff(starttime):
+    return starttime+TIME_DIFF
+
+def get_playing_position(channel_id):
+    global AUDIO_DELAY
+    global TIME_DIFF
+    if TIME_DIFF==0:
+        ping_procedure()
+    h=get_channel_history(channel_id)
+    index=0 if h[0]['artist'] else 1
+    if index==1:
+        stop()
+        play(CHANNEL_NAME_ID_DICT.keys()[CHANNEL_NAME_ID_DICT.values().index(str(channel_id))])
+    return (h[index]['started']+TIME_DIFF+(AUDIO_DELAY/1000000),h[index]['length'], h[index]['artist'], h[index]['title'])
+
 def get_channel_history(channel_id):
     url="http://api.audioaddict.com/v1/jazzradio/track_history/channel/%s.json" % channel_id
     response = _urllib.urlopen(url).read()
     result = json.loads(response)
     return result
 
-#FIXME: UNTESTED
+def get_msec_epoch():
+    import datetime
+    return int(((datetime.datetime.utcnow()-datetime.datetime(1970,1,1)).total_seconds())*1000)
+
+def convert_to_epoch(dt_obj):
+    import datetime
+    return int(((dt_obj-datetime.datetime(1970,1,1)).total_seconds())*1000)
+    
 def ping_procedure():
     import datetime
-    now=datetime.datetime.utcnow()
-    nowsec=int((now-datetime.datetime(1970,1,1)).total_seconds())
-    result=ping_response_parser(ping(nowsec))
+    epoch=get_msec_epoch()
+    result=ping_response_parser(ping(epoch))
+    nowsec=get_msec_epoch()
+    r=convert_to_epoch(result)
+    diff=nowsec-r
     global TIME_DIFF
-    TIME_DIFF=(now-result).total_seconds()
-    return (now-result).total_seconds()
+    TIME_DIFF=diff/1000
+    return TIME_DIFF
     
 
 def ping(time_stamp_13_digit):
