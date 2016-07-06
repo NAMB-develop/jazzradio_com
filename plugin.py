@@ -103,16 +103,34 @@ def get_currently_playing():
 def sync_serverstarttime_and_timediff(starttime):
     return starttime+TIME_DIFF
 
-def get_playing_position(channel_id):
+def get_playing_position(key):
+    print("Getting playing position")
     global AUDIO_DELAY
     global TIME_DIFF
     if TIME_DIFF==0:
         ping_procedure()
+    channel_id=CHANNEL_NAME_ID_DICT[key]
     h=get_channel_history(channel_id)
+    h.sort(key=lambda x: x['started'],reverse=True)
+    for i in h[0:2]:
+        if i['type']=='advertisement':
+            if (get_msec_epoch()/1000)-(i['started']+TIME_DIFF) < 120:
+                import time
+                print("Ad coming up at: %s" % time.ctime(i['started']))
+                print("Ad coming up at: %s" % time.ctime(i['started']+TIME_DIFF))
+                print("Current time: %s" % time.ctime(int(time.time())))
+                global PLAYER
+                instance=vlc.get_default_instance()
+                p=PLAYER
+                PLAYER=instance.media_player_new()
+                vlc.libvlc_audio_set_delay(PLAYER, AUDIO_DELAY)
+                PLAYER.set_media(p.get_media())
+                PLAYER.play()
+                time.sleep(2)
+                p.stop()
+            else:
+                print("Spotted past ad")
     index=0 if h[0]['artist'] else 1
-    if index==1:
-        stop()
-        play(CHANNEL_NAME_ID_DICT.keys()[CHANNEL_NAME_ID_DICT.values().index(str(channel_id))])
     return (h[index]['started']+TIME_DIFF+(AUDIO_DELAY/1000000),h[index]['length'], h[index]['artist'], h[index]['title'])
 
 def get_channel_history(channel_id):
@@ -128,7 +146,8 @@ def get_msec_epoch():
 def convert_to_epoch(dt_obj):
     import datetime
     return int(((dt_obj-datetime.datetime(1970,1,1)).total_seconds())*1000)
-    
+
+#Not sure how this would work...
 def ping_procedure():
     import datetime
     epoch=get_msec_epoch()

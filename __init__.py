@@ -14,6 +14,7 @@ def ui_loop():
 class List(object):
 
     def __init__(self, parent):
+        self.temp_started=0
         self.parentclass =parent
         self.stop=[True]
         self.items = None
@@ -28,6 +29,13 @@ class List(object):
         #self.parent.master.master.bind("<Up>", lambda e: self.shift(1))
         #self.parent.master.master.bind("<Down>", lambda e: self.shift(-1))
         #self.parent.master.master.bind("<Return>", lambda e: self.select())
+
+    def shiftshift(self):
+        import time
+        now = int(time.time())
+        diff=now-self.temp_started
+        print("Time diff set to: %s"  % diff)
+        plugin.TIME_DIFF=diff
 
     def focus_receive(self):
         self.activate(self.at)
@@ -45,7 +53,10 @@ class List(object):
             self.deactivate(self.at)
             namb.userinput.set_receiver(self.parentclass.tabs)
             self.parentclass.tabs.focus_receive()
+        elif event=="test":
+            self.shiftshift()
 
+#FIXME: Implement playlist for a channel. Deduce when a song it to end based on start and duration. Keep local clock of when it started etc. Gather information about next song without affecting the current timer.
     def currently_playing_loop(self, event=None):
         st=self.stop
         c=self.playing
@@ -56,26 +67,33 @@ class List(object):
             return m if len(m)>1 else "0"+m, s if len(s)>1 else "0"+s
         
         def display_current(artist, title):
+            c[0].delete("current")
             c[0].create_text((c[0].winfo_width()/4), (c[0].winfo_height()/3), anchor=tkint.W, tags=("current",), text="%s - %s" % (artist, title),fill="white")
 
-        
-        start, duration, artist, title = plugin.get_playing_position(c[1]['id'])
-        display_current(artist, title)
-        import time,datetime
-        def loop(start, duration):
-            
-            current=int((plugin.get_msec_epoch()/1000)-start)
-            if duration-current < 3:
-                start, duration, artist, title = plugin.get_playing_position(c[1]['id'])
-                c[0].delete("current")
-                display_current(artist, title)
-                
-            c[0].delete("timer")
-            div=current / float(duration)
+        def display_timing(current, duration):
+            div=current/float(duration)
             rem=duration-current
+            c[0].delete("timer")
             c[0].create_rectangle(c[0].winfo_width()/4,(c[0].winfo_height()/8)*5,(c[0].winfo_width()/4)+(((c[0].winfo_width()/8)*5)*div),((c[0].winfo_height()/8)*7), fill="#4f4f4f", tags=("timer",))
             c[0].create_text(c[0].winfo_width()/4, (c[0].winfo_height()/8)*6, anchor=tkint.W, tags=("timer",), text=" %s:%s"%format_time(current),fill="white")
             c[0].create_text((c[0].winfo_width()/8)*7, (c[0].winfo_height()/8)*6, anchor=tkint.E, tags=("timer",), text="-%s:%s "%format_time(rem),fill="white")
+
+        
+        start, duration, artist, title = plugin.get_playing_position(c[1]['key'])
+        self.temp_started=start
+        display_current(artist, title)
+        import time,datetime
+        def loop(start, duration):
+            now=(plugin.get_msec_epoch()/1000)
+            current=int(now-start)
+            if duration-current < 5:
+                c[0].delete("current")
+                start, duration, artist, title = plugin.get_playing_position(c[1]['key'])
+                if now > start-3:
+                    self.temp_started=start
+                    display_current(artist, title)
+            else:
+                display_timing(current, duration)
             if st[0]:
                 c[0].after(1000, lambda: loop(start, duration))
             else:
@@ -94,6 +112,7 @@ class List(object):
             self.playing=self.items[self.at]
             if plugin.play(key)==0:
                 self.frame.after(1, lambda: self.currently_playing_loop())
+                self.frame.after(1000, lambda: print(plugin.PLAYER.))
         self.frame.after(1, d)
 
 
