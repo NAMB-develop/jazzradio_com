@@ -23,6 +23,43 @@ else:
     if not vlc:
         raise Exception("VLC extension not loaded.")
 
+
+def thread_reader(queue):
+    pass
+
+import threading
+
+def co_reader(queue, event):
+    print("Started coreader")
+    import time
+    import urllib2
+    req=urllib2.Request(stream)
+    req.add_header("Referer",referer)
+    req.add_header("User-Agent",HTTP_SETTINGS["User-Agent"])
+    st=urllib2.urlopen(req)
+    title_dur=("Test",123)
+    while not event.is_set():
+	data=st.read(8192)
+	if not data:
+		print("Stream closed, or ahead?")
+		st.close()
+	if "onMetaData" in data:
+		index=data.index('onMetaData')
+		start=index+20+10
+		try:
+			length=int(data[start], 16)
+		except ValueError:
+			length=int(data[start].encode('hex'), 16)
+		start=start+1
+		title_dur=(data[start:start+length], 0)
+	if "time" in data:
+		index=data.index('time')+4
+		index_end=data.index('t',index)
+		queue.put((title_dur[0], data[index:index_end]))
+		
+	time.sleep(1)
+    print("Closing listeneing stream therad")
+
 def initialize_dict():
     global CHANNELS
     global CHANNEL_NAME_ID_DICT
@@ -46,16 +83,24 @@ def get_currently_playing_channel(channel_key):
 
 def play(channel_key):
     streams=get_stream_for_channel(channel_key)
-    referer="http://www.jazzradio.com/"+channel_key
+    ref="http://www.jazzradio.com/"+channel_key
     instance=vlc.get_default_instance()
     global PLAYER
     if not PLAYER:
         PLAYER=instance.media_player_new()
         vlc.libvlc_audio_set_delay(PLAYER, AUDIO_DELAY)
+        ev=PLAYER.event_manager()
+        def meta(ev):
+            print(ev)
+        ev.event_attach(vlc.EventType.MediaMetaChanged, meta)
+    global stream
+    stream=streams[0]
+    global referer
+    referer=ref
     media=instance.media_new(streams[0])
     global HTTP_SETTINGS
     media.add_option(":http-user-agent="+HTTP_SETTINGS["User-Agent"])
-    media.add_option(":http-referrer="+referer)
+    media.add_option(":http-referrer="+ref)
     PLAYER.set_media(media)
     return PLAYER.play()
 

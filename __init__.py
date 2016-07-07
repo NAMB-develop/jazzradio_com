@@ -60,6 +60,12 @@ class List(object):
     def currently_playing_loop(self, event=None):
         st=self.stop
         c=self.playing
+        import threading
+        _stop = threading.Event()
+        queue=Queue.Queue()
+        t=threading.Thread(target=plugin.co_reader, args=(queue,_stop))
+        t.daemon=True
+        t.start()
 
         def format_time(seconds):
             m=str(seconds/60)
@@ -86,11 +92,19 @@ class List(object):
         def loop(start, duration):
             now=(plugin.get_msec_epoch()/1000)
             current=int(now-start)
-            if duration-current < 5:
-                c[0].delete("current")
-                start, duration, artist, title = plugin.get_playing_position(c[1]['key'])
-                if now > start-3:
-                    self.temp_started=start
+            if not queue.empty():
+                ev=queue.get()
+                if ev[1]:
+                    start=now
+                    duration=int(ev[1][0:3].encode('hex'), 16)+int(ev[1][3].encode('hex'), 16)
+                    print(ev[1].encode('hex'))
+                    print(duration)
+                    sev=ev[0].split(" - ")
+                    artist=sev[0]
+                    if len(sev)>1:
+                        title=sev[1]
+                    else:
+                        title="No title"
                     display_current(artist, title)
             else:
                 display_timing(current, duration)
@@ -99,6 +113,7 @@ class List(object):
             else:
                 c[0].delete("timer")
                 c[0].delete("current")
+                _stop.set()
         
         c[0].after(1, lambda: loop(start, duration))
         
@@ -112,7 +127,7 @@ class List(object):
             self.playing=self.items[self.at]
             if plugin.play(key)==0:
                 self.frame.after(1, lambda: self.currently_playing_loop())
-                self.frame.after(1000, lambda: print(plugin.PLAYER.))
+                #self.frame.after(1000, lambda: print(plugin.PLAYER.))
         self.frame.after(1, d)
 
 
