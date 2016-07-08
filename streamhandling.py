@@ -110,6 +110,7 @@ class Streamer(object):
         self.packets=packets
         self.event=event
         self.stop=threading.Event()
+        self.thread=None
 
     def stop(self):
         print("Stopping thread")
@@ -117,9 +118,10 @@ class Streamer(object):
 
     def start(self):
         print("Starting thread")
-        self.thread=threading.Thread(target=self.run)
-        self.thread.daemon=True
-        self.thread.start()
+        if not self.thread:
+            self.thread=threading.Thread(target=self.run)
+            self.thread.daemon=True
+            self.thread.start()
 
     def run(self):
         self.stream=create_stream(create_request())
@@ -151,9 +153,9 @@ import Queue, subprocess
 class Worker(object):
 
     def __init__(self):
-        self.ad_event=threading.Event()
+        self.ad_event1=threading.Event()
         self.buffer1=Queue.Queue()
-        self.s1=Streamer(self.ad_event, self.buffer1)
+        self.s1=Streamer(self.ad_event1, self.buffer1)
         self.ad_event2=threading.Event()
         self.buffer2=Queue.Queue()
         self.s2=Streamer(self.ad_event2, self.buffer2)
@@ -162,13 +164,21 @@ class Worker(object):
     def run(self):
         process=subprocess.Popen(["X:\\My Documents\\Projects\\VLC\\vlc","-"], stdin=subprocess.PIPE)
         self.s1.start()
+        adcoming=False
         while True:
             p=self.current.get(True)
             process.stdin.write(p[6])
             if "adswizz" in p[5]:
                 print("Ad!")
                 self.s2.start()
-                
+                adcoming=True
+            if adcoming:
+                if not self.buffer2.empty():
+                    p2=self.buffer2.get()
+                    if p[5]==p2[5]:
+                        self.current=self.buffer2
+                        adcoming=False
+                        self.s1.stop()
                 #self.s1.stop()
                 #process.kill()
         
