@@ -96,8 +96,7 @@ class List(object):
                 ev=queue.get()
                 if ev[1]:
                     start=now
-                    duration=int(ev[1][0:3].encode('hex'), 16)+int(ev[1][3].encode('hex'), 16)
-                    print(ev[1].encode('hex'))
+                    duration=ev[1]
                     print(duration)
                     sev=ev[0].split(" - ")
                     artist=sev[0]

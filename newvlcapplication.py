@@ -2,19 +2,12 @@ import urllib2
 
 import ctypes
 
-MediaOpenCb = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_uint64))
-MediaReadCb = ctypes.CFUNCTYPE(ctypes.c_ssize_t, ctypes.c_void_p, ctypes.c_char_p, ctypes.c_size_t)
-MediaSeekCb = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_uint64)
-MediaCloseCb = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p)
+#MediaOpenCb = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_uint64))
+#MediaReadCb = ctypes.CFUNCTYPE(ctypes.c_ssize_t, ctypes.c_void_p, ctypes.c_char_p, ctypes.c_size_t)
+#MediaSeekCb = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_uint64)
+#MediaCloseCb = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p)
 
-import sys, os
-sys.path.insert(0, os.path.join("..","..",".."))
-
-import extensions
-extensions.load_extension("vlc")
-global vlc
-vlc=extensions.get_extension("vlc")
-from extensions.vlc.vlc.generated_vlc import CallbackDecorators
+import edited_vlc as vlc
 
 class Media(object):
 
@@ -24,30 +17,37 @@ class Media(object):
     def open_media(self):
         self.stream=urllib2.urlopen(self.request)
 
-@MediaReadCb
+#@MediaReadCb
 def read_cb(opaque, buf, length):
-    #print("Reading: %s %s %s" % (opaque, buf, length))
-    print("Reading: %s %s %s" % (type(opaque), type(buf), type(length)))
-    data=m.stream.read(length)
-    print(data[0:2])
-    print(buf)
-    buf=data
-    return len(data)
+    print("Reading: %r %r %r" % (opaque, buf, length))
+    print("Reading: %r %r %r" % (type(opaque), type(buf), type(length)))
+    data=m.stream.read(length.value)
+    buf.value=data
+    length.value=len(data)
+    print("%r" % data[0:2])
+    #print(buf)
+    #buf=data
+    return length.value
 
-@MediaCloseCb
+#@MediaCloseCb
 def close_cb(opaque):
     opaque.stream.close()
     pass
 
-@MediaOpenCb
+#@MediaOpenCb
 def open_cb(opaque, unknown, number):
     print("Opening: %s %s %s" % (type(opaque),type(unknown),type(number)))
     opaque.stream=urllib2.urlopen(opaque.request)
     return 0
 
-@MediaSeekCb
+#@MediaSeekCb
 def seek_cb(unknown, number):
     return 0
+
+read_cb.argtypes=[ctypes.c_void_p, ctypes.c_char_p, ctypes.c_size_t]
+read_cb.restype=ctypes.c_ssize_t
+
+rb=vlc.CallbackDecorators.MediaReadCb(read_cb)
 
 url="http://pub8.jazzradio.com/jr_pariscafe_aacplus.flv"
 referer='http://www.jazzradio.com/pariscafe'
@@ -66,7 +66,7 @@ def create_media(vlc_instance, m):
     
     return vlc.libvlc_media_new_callbacks(vlc_instance,
                                           None,
-                                          read_cb,
+                                          rb,
                                           None,
                                           None,
                                           t)

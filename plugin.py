@@ -38,26 +38,43 @@ def co_reader(queue, event):
     req.add_header("User-Agent",HTTP_SETTINGS["User-Agent"])
     st=urllib2.urlopen(req)
     title_dur=("Test",123)
+    byteamount=0
     while not event.is_set():
-	data=st.read(8192)
-	if not data:
-		print("Stream closed, or ahead?")
-		st.close()
-	if "onMetaData" in data:
-		index=data.index('onMetaData')
-		start=index+20+10
-		try:
-			length=int(data[start], 16)
-		except ValueError:
-			length=int(data[start].encode('hex'), 16)
-		start=start+1
-		title_dur=(data[start:start+length], 0)
-	if "time" in data:
-		index=data.index('time')+4
-		index_end=data.index('t',index)
-		queue.put((title_dur[0], data[index:index_end]))
-		
-	time.sleep(1)
+        data=st.read(8192*2*2*2*2*2*2)
+        byteamount=byteamount+len(data)
+        
+        if not data:
+            print("Stream closed, or ahead?")
+            st.close()
+        if "onMetaData" in data:
+            print("%s + %s" % (time.ctime(int(time.time())), byteamount))
+            print("%r"%data)
+            index=data.index('onMetaData')
+            start=index+20+10
+            try:
+                length=int(data[start], 16)
+            except ValueError:
+                length=int(data[start].encode('hex'), 16)
+            start=start+1
+            title_dur=(data[start:start+length], 0)
+        if "time" in data:
+            index=data.index('time')+6
+            index_end=index+3
+            sel=data[index:data.index('t', index)-2]
+            #print(sel)
+            #print(sel.encode('hex'))
+            print("%r"%sel)
+            if len(sel)>2:
+                duration=int(sel[0:2].encode('hex'), 16)+int(sel[2].encode('hex'), 16)
+            else:
+                duration=120
+            queue.put((title_dur[0], duration))
+        if "tlPreciseTime" in data:
+            index=data.index('tlPreciseTime')
+            index_end=index+20
+            #print()
+            
+        time.sleep(1)
     print("Closing listeneing stream therad")
 
 def initialize_dict():
@@ -89,10 +106,6 @@ def play(channel_key):
     if not PLAYER:
         PLAYER=instance.media_player_new()
         vlc.libvlc_audio_set_delay(PLAYER, AUDIO_DELAY)
-        ev=PLAYER.event_manager()
-        def meta(ev):
-            print(ev)
-        ev.event_attach(vlc.EventType.MediaMetaChanged, meta)
     global stream
     stream=streams[0]
     global referer
