@@ -335,10 +335,15 @@ class Worker(object):
         global instance
         instance=extensions.get_extension("vlc").Instance('-vvv')
 
-        m=instance.media_new_callbacks(None, rb, None, None, None)
+        import imem
+
+        global q
+        q=Queue.Queue()
+
+        mm=imem.Media_Cast_Queue(instance, create_request(), q)
         p=instance.media_player_new()
 
-        p.set_media(m)
+        p.set_media(mm.get_media())
 
         def play():
             p.play()
@@ -346,8 +351,7 @@ class Worker(object):
         import threading
         threading.Timer(5, p.play, ()).start()
             
-        global q
-        q=Queue.Queue()
+
 
         return q
         
