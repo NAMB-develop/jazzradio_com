@@ -25,11 +25,6 @@ class List(object):
         self.frame.place(x=0,y=0,width=width,height=int(((height/10.0)*9)))
         self.at=0
 
-        
-        #self.parent.master.master.bind("<Up>", lambda e: self.shift(1))
-        #self.parent.master.master.bind("<Down>", lambda e: self.shift(-1))
-        #self.parent.master.master.bind("<Return>", lambda e: self.select())
-
     def shiftshift(self):
         import time
         now = int(time.time())

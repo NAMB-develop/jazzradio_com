@@ -1,6 +1,23 @@
 import urllib2
 import socket
 
+import ctypes
+import Queue
+
+q=None
+
+MediaReadCb = ctypes.CFUNCTYPE(ctypes.c_ssize_t, ctypes.c_void_p, ctypes.POINTER(ctypes.c_char), ctypes.c_size_t) # Works!
+
+def read_cb(opaque, buf, length):
+#    print("Reading: %r %r %r" % (opaque, buf, length))
+    data=q.get()
+    for i in range(len(data)):
+        buf[i]=data[i]
+#    print("%r" % data[0:2])
+    return len(data)
+
+rb=MediaReadCb(read_cb)
+
 def create_request():
     req=urllib2.Request("http://pub8.jazzradio.com/jr_pariscafe_aacplus.flv")
     req.add_header('Referer','http://www.jazzradio.com/pariscafe')
@@ -288,6 +305,8 @@ def read_metadata(metadata):
                 pass
     return result
 
+instance=None
+
 class Worker(object):
 
     def __init__(self, event=None):
@@ -305,6 +324,63 @@ class Worker(object):
         self.t_prev_ad=time.time()
         self.songchanges=Queue.Queue()
 
+
+    def start_vlc_imem(self):
+        import sys, os
+        sys.path.insert(0, os.path.join("..","..",".."))
+
+        import extensions
+        extensions.load_extension("vlc")
+        
+        global instance
+        instance=extensions.get_extension("vlc").Instance('-vvv')
+
+        m=instance.media_new_callbacks(None, rb, None, None, None)
+        p=instance.media_player_new()
+
+        p.set_media(m)
+
+        def play():
+            p.play()
+        
+        import threading
+        threading.Timer(5, p.play, ()).start()
+            
+        global q
+        q=Queue.Queue()
+
+        return q
+        
+
+    def start_vlc_v2(self):
+        import sys, os
+        sys.path.insert(0, os.path.join("..","..",".."))
+
+        import extensions
+        extensions.load_extension("vlc")
+        
+        global instance
+        instance=extensions.get_extension("vlc").get_default_instance()
+
+        os.mkfifo("temp")
+
+        m=instance.media_new("temp")
+        p=instance.media_player_new()
+        p.set_media(m)
+        p.play()
+
+        
+        fifo=open("temp",'wb',0)
+        def proc_shell():
+            pass
+        proc_shell.stdin=fifo
+        proc=proc_shell
+
+        
+        return proc
+        
+        
+        
 
 
     def start_vlc(self):
@@ -353,7 +429,7 @@ class Worker(object):
         if "onMetaData" in self.p[5]:
             print(read_metadata(self.p[5]))
 
-    def process(self):
+    def process_v2(self):
         if self.slowdown:
             #print("Slowdown!")
             if self.streamers[self.cur].packets.qsize() < 120:
@@ -377,14 +453,45 @@ class Worker(object):
             if "tlPreciseTime" in d and "StreamTitle" in d:
                 correctedtime=self.streamers[self.cur].start_time+int(d["tlPreciseTime"])
                 self.songchanges.put((correctedtime, d["StreamTitle"]))
-            print(d)  
+            print(d)
+            return True
+        return False
+
+    def process_v2_imem(self):
+        if self.slowdown:
+            #print("Slowdown!")
+            if self.streamers[self.cur].packets.qsize() < 120:
+                return
+        else:
+            self.slowdown=time.time() - self.startuptime < 0 #Never true
+        
+        try:
+            self.p=self.streamers[self.cur].packets.get(True, 5)
+        except Queue.Empty:
+            print("Empty queue for longer than 5 seconds!")
+            return
+        if self.p[3] and len(self.p[3]) == 4:
+            self.p[3]=transform_time(transform_time(self.p[3],-1*self.offset_start), self.offset)
+        data="".join(filter(None, self.p))
+        q.put(data)
+        #print("Writing")
+        #self.f.write(data)
+        if "onMetaData" in self.p[5]:
+            d=read_metadata(self.p[5])
+            if "tlPreciseTime" in d and "StreamTitle" in d:
+                correctedtime=self.streamers[self.cur].start_time+int(d["tlPreciseTime"])
+                self.songchanges.put((correctedtime, d["StreamTitle"]))
+            print(d)
+            return True
+        return False        
             
     def run_repeatable(self):
         self.streamers=[self.s1, self.s2]
         self.cur=0
         self.streamers[self.cur].start()
         self.startuptime=int(time.time())
-        self.proc=self.start_ffplay()
+        #self.proc=self.start_ffplay()
+        self.proc=self.start_vlc_imem()
         adcoming=False
         self.delay=30
         self.offset=0
@@ -395,9 +502,10 @@ class Worker(object):
         self.stdinwrite_speed=0
 
         while True:
-            self.process()
             self.delayer = time.time()-self.t_prev_ad > self.delay
+            self.trackswitch = self.process_v2_imem()
             if self.ad_switch and self.delayer and self.streamers[self.cur].event.is_set():
+            #if self.trackswitch:
                 self.streamers[self.cur].event.clear()
                 self.t_prev_ad=time.time()
                 print("Ad!")
