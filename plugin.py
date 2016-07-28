@@ -29,6 +29,27 @@ def thread_reader(queue):
 
 import threading
 
+def create_player():
+    global PLAYER
+    if not PLAYER:
+        PLAYER=vlc.get_default_instance().media_player_new()
+        vlc.libvlc_audio_set_delay(PLAYER, AUDIO_DELAY)    
+
+def generate_media(channel_key):
+    import stream as s
+    streams=get_stream_for_channel(channel_key)
+    ref="http://www.jazzradio.com/"+channel_key
+    instance=vlc.get_default_instance()
+    global stream
+    stream=streams[0]
+    global referer
+    referer=ref
+    req=_urllib.Request(stream)
+    req.add_header('Referer',referer)
+    req.add_header('User-Agent',HTTP_SETTINGS["User-Agent"])
+    media=s.MediaHandler(instance, req)
+    return media
+
 def co_reader(queue, event):
     print("Started coreader")
     import time
@@ -102,10 +123,7 @@ def play(channel_key):
     streams=get_stream_for_channel(channel_key)
     ref="http://www.jazzradio.com/"+channel_key
     instance=vlc.get_default_instance()
-    global PLAYER
-    if not PLAYER:
-        PLAYER=instance.media_player_new()
-        vlc.libvlc_audio_set_delay(PLAYER, AUDIO_DELAY)
+    create_player()
     global stream
     stream=streams[0]
     global referer
@@ -116,6 +134,16 @@ def play(channel_key):
     media.add_option(":http-referrer="+ref)
     PLAYER.set_media(media)
     return PLAYER.play()
+
+def set_media(media):
+    PLAYER.set_media(media)
+
+def play():
+    if PLAYER:
+        return PLAYER.play()
+    else:
+        print("No PLAYER exists.")
+    return -1
 
 def stop():
     global PLAYER
@@ -170,25 +198,10 @@ def get_playing_position(key):
     channel_id=CHANNEL_NAME_ID_DICT[key]
     h=get_channel_history(channel_id)
     h.sort(key=lambda x: x['started'],reverse=True)
-    for i in h[0:2]:
-        if i['type']=='advertisement':
-            if (get_msec_epoch()/1000)-(i['started']+TIME_DIFF) < 120:
-                import time
-                print("Ad coming up at: %s" % time.ctime(i['started']))
-                print("Ad coming up at: %s" % time.ctime(i['started']+TIME_DIFF))
-                print("Current time: %s" % time.ctime(int(time.time())))
-                global PLAYER
-                instance=vlc.get_default_instance()
-                p=PLAYER
-                PLAYER=instance.media_player_new()
-                vlc.libvlc_audio_set_delay(PLAYER, AUDIO_DELAY)
-                PLAYER.set_media(p.get_media())
-                PLAYER.play()
-                time.sleep(2)
-                p.stop()
-            else:
-                print("Spotted past ad")
-    index=0 if h[0]['artist'] else 1
+    for i in range(len(h)):
+        if h[i]['artist']:
+            break
+    index=i
     return (h[index]['started']+TIME_DIFF+(AUDIO_DELAY/1000000),h[index]['length'], h[index]['artist'], h[index]['title'])
 
 def get_channel_history(channel_id):
