@@ -39,9 +39,9 @@ class List(object):
         import namb.userinput.keys
         import namb.userinput
         if event==namb.userinput.keys.UP:
-            self.shift(1)
-        elif event==namb.userinput.keys.DOWN:
             self.shift(-1)
+        elif event==namb.userinput.keys.DOWN:
+            self.shift(1)
         elif event==namb.userinput.keys.ENTER:
             self.select()
         elif event==namb.userinput.keys.BACK:
@@ -172,12 +172,12 @@ class List(object):
         self.items = None
 
     def shift(self, posneg):
-        p=posneg*-1
+        p=posneg #*-1
         if p+self.at<0 or p+self.at==len(self.items):
             return
 
         if self.items[p+self.at][0].winfo_y()+self.frame.winfo_y()>(height/10.0)*8 or self.items[p+self.at][0].winfo_y()+self.frame.winfo_y()<height/30:
-            offset=posneg*(height/15)
+            offset=posneg*(height/15)*-1
             self.frame.place(y=self.frame.winfo_y()+offset)
 
         self.update(p)
