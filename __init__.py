@@ -342,9 +342,13 @@ if __name__=="__main__":
     root.bind("<Escape>", lambda e: root.destroy())
     root.focus_set()
 
-    import namb.userinput.keyboard
-    namb.userinput.keyboard.setup()
-    namb.userinput.keyboard.bind(root)
+    #import namb.userinput.keyboard
+    #namb.userinput.keyboard.setup()
+    #namb.userinput.keyboard.bind(root)
+
+    import namb.userinput.hook
+    namb.userinput.hook.setup()
+    namb.userinput.hook.hookup()
 
     import namb.userinput.ui_server
     namb.userinput.ui_server.run()
